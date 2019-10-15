@@ -1,0 +1,5 @@
+profile: service
+defaultPackage: com.dodo.bank
+---
+testFramework: kotlintest
+sourceLanguage: kotlin
