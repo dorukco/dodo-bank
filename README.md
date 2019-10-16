@@ -4,8 +4,7 @@ This repository contains the code and the API documentation of a simple banking 
 
 ## Requirements
 
-* Docker
-* JDK 8 or newer & Maven for development.
+* JDK 11 or newer & Maven for development.
 
 ## API Documentation
 
