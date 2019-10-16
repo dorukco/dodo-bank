@@ -12,9 +12,12 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.spekframework.spek2.Spek
 import org.spekframework.spek2.style.specification.describe
 import java.math.BigDecimal
+import java.util.concurrent.atomic.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -135,6 +138,48 @@ class BankSpecificationTest : Spek({
                         AccountResponse::class.java)
                 assertEquals(HttpStatus.OK, response.status)
                 assertEquals(BigDecimal("351.50"), response.body()?.amount)
+            }
+        }
+
+        describe("Concurrent transactions and check the balance of the accounts") {
+
+            it("Try to execute concurrent transactions") {
+
+                val transfer = TransferCreateRequest(2, 1, BigDecimal("50.00"))
+                val successfulTransactions = AtomicInteger(0)
+                val failedTransactions = AtomicInteger(0)
+
+                runBlocking {
+                    repeat(10) {
+                        launch {
+                            val request: HttpRequest<Any> = HttpRequest.POST("/transfer", transfer)
+                            try {
+                                val response: HttpResponse<TransferResponse> = client.toBlocking().exchange(request)
+                                if (HttpStatus.CREATED == response.status) successfulTransactions.incrementAndGet()
+                            } catch (e: HttpClientResponseException) {
+                                failedTransactions.incrementAndGet()
+                            }
+                        }
+                    }
+                }
+                assertEquals(7, successfulTransactions.get())
+                assertEquals(3, failedTransactions.get())
+            }
+
+            it("Check the balance of the sender account") {
+                val request: HttpRequest<Any> = HttpRequest.GET("/account/2")
+                val response: HttpResponse<AccountResponse> = client.toBlocking().exchange(request,
+                        AccountResponse::class.java)
+                assertEquals(HttpStatus.OK, response.status)
+                assertEquals(BigDecimal("1.50"), response.body()?.amount)
+            }
+
+            it("Check the balance of the receiver account") {
+                val request: HttpRequest<Any> = HttpRequest.GET("/account/1")
+                val response: HttpResponse<AccountResponse> = client.toBlocking().exchange(request,
+                        AccountResponse::class.java)
+                assertEquals(HttpStatus.OK, response.status)
+                assertEquals(BigDecimal("399.50"), response.body()?.amount)
             }
         }
 
